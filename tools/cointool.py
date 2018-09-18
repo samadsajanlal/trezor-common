@@ -569,10 +569,9 @@ def check(backend, icons, show_duplicates):
 @click.option("-f", "--filter", metavar="FIELD=FILTER", multiple=True, help="Include only coins that match a filter")
 @click.option("-F", "--filter-exclude", metavar="FIELD=FILTER", multiple=True, help="Exclude coins that match a filter")
 @click.option("-t", "--exclude-tokens", is_flag=True, help="Exclude ERC20 tokens. Equivalent to '-E erc20'")
+@click.option("-d", "--device", metavar="NAME", help="Only include coins supported on a given device")
 # fmt: on
-@click.pass_context
 def dump(
-    ctx,
     outfile,
     support,
     pretty,
@@ -584,6 +583,7 @@ def dump(
     filter,
     filter_exclude,
     exclude_tokens,
+    device,
 ):
     """Dump coin data in JSON format
 
@@ -625,10 +625,9 @@ def dump(
         )
 
     coins = coin_info.coin_info()
+    support_info = coin_info.support_info(coins.as_list())
 
     if support:
-        support_info = coin_info.support_info(coins.as_list())
-
         for category in coins.values():
             for coin in category:
                 coin["support"] = support_info[coin["key"]]
@@ -648,14 +647,20 @@ def dump(
 
     def should_include_coin(coin):
         for field, filter in include_filters:
+            filter = filter.lower()
             if field not in coin:
                 return False
-            if not fnmatch.fnmatch(coin[field], filter):
+            if not fnmatch.fnmatch(coin[field].lower(), filter):
                 return False
         for field, filter in exclude_filters:
+            filter = filter.lower()
             if field not in coin:
                 continue
-            if fnmatch.fnmatch(coin[field], filter):
+            if fnmatch.fnmatch(coin[field].lower(), filter):
+                return False
+        if device:
+            is_supported = support_info[coin["key"]].get(device, None)
+            if not is_supported:
                 return False
         return True
 
